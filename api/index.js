@@ -9,8 +9,14 @@ app.use(cors());
 app.use(express.json()); // Parses incoming JSON requests
 
 // Root route
-app.get("/", (req, res) => {
-  res.send("Word Game Backend is running!");
+app.get("/", async (req, res) => {
+  try {
+    await pool.query("SELECT NOW()"); // Check if database is responding
+    res.send("Word Game Backend is running and DB is connected!");
+  } catch (err) {
+    console.error("Database connection failed: ", err.message);
+    res.status(500).send("Server Error: Unable to connect to DB");
+  }
 });
 
 // Get all categories
