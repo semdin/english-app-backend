@@ -1,8 +1,8 @@
 const express = require("express");
 const cors = require("cors");
-const serverless = require("serverless-http");
+const serverless = require("serverless-http"); // Make sure this is installed
 const app = express();
-const pool = require("../db"); // Ensure the path is correct
+const pool = require("../db"); // Adjust the path if necessary
 
 // Middleware
 app.use(cors());
@@ -95,5 +95,5 @@ app.get("/api/user-progress/:userId/:categoryId", async (req, res) => {
   }
 });
 
-// Export the handler for Vercel
-module.exports.handler = serverless(app);
+// Export the serverless function
+module.exports = serverless(app);
