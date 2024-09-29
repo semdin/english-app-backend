@@ -1,22 +1,19 @@
+// server.js
+
+require("dotenv").config(); // Load environment variables
 const express = require("express");
 const cors = require("cors");
-const serverless = require("serverless-http"); // Make sure this is installed
 const app = express();
-const pool = require("../db"); // Adjust the path if necessary
+const pool = require("./db"); // Database connection
+const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json()); // Parses incoming JSON requests
 
 // Root route
-app.get("/", async (req, res) => {
-  try {
-    await pool.query("SELECT NOW()"); // Check if database is responding
-    res.send("Word Game Backend is running and DB is connected!");
-  } catch (err) {
-    console.error("Database connection failed: ", err.message);
-    res.status(500).send("Server Error: Unable to connect to DB");
-  }
+app.get("/", (req, res) => {
+  res.send("Word Game Backend is running!");
 });
 
 // Get all categories
@@ -101,5 +98,7 @@ app.get("/api/user-progress/:userId/:categoryId", async (req, res) => {
   }
 });
 
-// Export the serverless function
-module.exports = serverless(app);
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is listening on port ${port}`);
+});
