@@ -1,28 +1,36 @@
-// server.js
-
 require("dotenv").config(); // Load environment variables
 const express = require("express");
 const cors = require("cors");
+const { createClient } = require("@supabase/supabase-js"); // Supabase SDK
 const app = express();
-const pool = require("./db"); // Database connection
 const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json()); // Parses incoming JSON requests
 
+// Supabase client initialization
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
 // Root route
 app.get("/", (req, res) => {
-  res.send("Word Game Backend is running!");
+  res.send("Word Game Backend is running with Supabase!");
 });
 
-// Get all categories
+// Get all categories from Supabase
 app.get("/api/categories", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM categories");
-    res.json(result.rows);
+    const { data: categories, error } = await supabase
+      .from("categories")
+      .select("*");
+    if (error) throw error;
+
+    res.json(categories);
   } catch (err) {
-    console.error(err.message);
+    console.error("Error fetching categories:", err.message);
     res.status(500).send("Server Error");
   }
 });
@@ -31,15 +39,15 @@ app.get("/api/categories", async (req, res) => {
 app.get("/api/words/:categoryId", async (req, res) => {
   const { categoryId } = req.params;
   try {
-    const result = await pool.query(
-      `SELECT w.* FROM words w
-       INNER JOIN word_categories wc ON w.id = wc.word_id
-       WHERE wc.category_id = $1`,
-      [categoryId]
-    );
-    res.json(result.rows);
+    const { data: words, error } = await supabase
+      .from("words")
+      .select("id, word, definition") // Adjust based on your table's columns
+      .eq("category_id", categoryId); // Assuming category_id exists in words table
+
+    if (error) throw error;
+    res.json(words);
   } catch (err) {
-    console.error(err.message);
+    console.error("Error fetching words:", err.message);
     res.status(500).send("Server Error");
   }
 });
@@ -48,52 +56,60 @@ app.get("/api/words/:categoryId", async (req, res) => {
 app.get("/api/examples/:wordId/:categoryId", async (req, res) => {
   const { wordId, categoryId } = req.params;
   try {
-    const result = await pool.query(
-      `SELECT sentence FROM example_sentences
-       WHERE word_id = $1 AND category_id = $2`,
-      [wordId, categoryId]
-    );
-    res.json(result.rows);
+    const { data: examples, error } = await supabase
+      .from("example_sentences")
+      .select("sentence")
+      .eq("word_id", wordId)
+      .eq("category_id", categoryId);
+
+    if (error) throw error;
+    res.json(examples);
   } catch (err) {
-    console.error(err.message);
+    console.error("Error fetching examples:", err.message);
     res.status(500).send("Server Error");
   }
 });
 
 // Save user progress
 app.post("/api/user-progress", async (req, res) => {
-  const { userId = 0, categoryId, lastWordId } = req.body;
+  const { userId, categoryId, lastWordId } = req.body;
   try {
-    const result = await pool.query(
-      `INSERT INTO user_progress (user_id, category_id, last_word_id)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id, category_id)
-       DO UPDATE SET last_word_id = EXCLUDED.last_word_id RETURNING *`,
-      [userId, categoryId, lastWordId]
-    );
-    res.json(result.rows[0]);
+    const { data, error } = await supabase
+      .from("user_progress")
+      .upsert({
+        user_id: userId,
+        category_id: categoryId,
+        last_word_id: lastWordId,
+      })
+      .select("*"); // Returns the updated or inserted row
+
+    if (error) throw error;
+    res.json(data[0]);
   } catch (err) {
-    console.error(err.message);
+    console.error("Error saving user progress:", err.message);
     res.status(500).send("Server Error");
   }
 });
 
-// Get user progress
+// Get user progress for a specific category
 app.get("/api/user-progress/:userId/:categoryId", async (req, res) => {
-  const { userId = 0, categoryId } = req.params;
+  const { userId, categoryId } = req.params;
   try {
-    const result = await pool.query(
-      `SELECT last_word_id FROM user_progress
-       WHERE user_id = $1 AND category_id = $2`,
-      [userId, categoryId]
-    );
-    if (result.rows.length > 0) {
-      res.json(result.rows[0]);
+    const { data: progress, error } = await supabase
+      .from("user_progress")
+      .select("last_word_id")
+      .eq("user_id", userId)
+      .eq("category_id", categoryId);
+
+    if (error) throw error;
+
+    if (progress.length > 0) {
+      res.json(progress[0]);
     } else {
       res.json({ last_word_id: null });
     }
   } catch (err) {
-    console.error(err.message);
+    console.error("Error fetching user progress:", err.message);
     res.status(500).send("Server Error");
   }
 });
