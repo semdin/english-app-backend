@@ -7,15 +7,6 @@ import psycopg2
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
-# Klasörün var olup olmadığını kontrol edip oluşturma
-def ensure_upload_folder_exists(upload_folder):
-    if not os.path.exists(upload_folder):
-        os.makedirs(upload_folder)
-
-# Geçersiz karakterleri dosya adından temizleme
-def clean_filename(filename):
-    return re.sub(r'[^\w\._-]', '', filename)
-
 # Veritabanı bağlantısı
 def connect_to_db():
     conn = psycopg2.connect(
@@ -44,29 +35,11 @@ def upload_file():
         return redirect(request.url)
 
     if file and file.filename.endswith('.xlsx'):
-        # Dosya adını temizle
-        filename = clean_filename(file.filename)
-
-        # uploads klasörünün var olup olmadığını kontrol et
-        upload_folder = 'uploads'
-        ensure_upload_folder_exists(upload_folder)
-
-        # Dosyayı uploads klasörüne kaydet
-        file_path = os.path.join(upload_folder, filename)
-        file.save(file_path)
-
         try:
-            # Excel dosyasını işleme
-            process_excel(file_path)
+            # Instead of saving the file, read the Excel file directly from the request
+            process_excel(file)
         except Exception as e:
             flash(f"Error processing file: {e}")
-        finally:
-            # Dosyanın işlendikten sonra serbest bırakılmasını sağla
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                except PermissionError:
-                    flash(f"Could not delete the file: {file_path}")
         
         flash('File processed and data added to database successfully!')
         return redirect(url_for('index'))
@@ -74,10 +47,10 @@ def upload_file():
     flash('Invalid file format. Please upload a .xlsx file.')
     return redirect(url_for('index'))
 
-def process_excel(file_path):
-    # Dosyayı "with" bloğu ile açarak dosyanın işlenmesinden sonra otomatik olarak serbest bırakılmasını sağlıyoruz
-    with pd.ExcelFile(file_path) as xls:
-        # Sayfaları ayırma
+def process_excel(file):
+    # Use the file object directly with pandas
+    with pd.ExcelFile(file) as xls:
+        # Read sheets from the in-memory Excel file
         words_df = pd.read_excel(xls, 'Words')
         categories_df = pd.read_excel(xls, 'Categories')
         example_sentences_df = pd.read_excel(xls, 'Example Sentences')
@@ -136,6 +109,3 @@ def process_excel(file_path):
         finally:
             cur.close()
             conn.close()
-
-if __name__ == '__main__':
-    app.run(port=3000, debug=True)
