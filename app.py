@@ -109,3 +109,6 @@ def process_excel(file):
         finally:
             cur.close()
             conn.close()
+
+if __name__ == "__main__":
+    app.run()
